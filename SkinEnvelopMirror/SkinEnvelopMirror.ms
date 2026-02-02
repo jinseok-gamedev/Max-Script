@@ -23,9 +23,9 @@ try (destroyDialog SkinEnvelopMirrorDialog) catch()
  */
 fn mirrorPoint3 pt axis = (
     case axis of (
-        1: point3 (-pt.x) pt.y pt.z    -- X axis
-        2: point3 pt.x (-pt.y) pt.z    -- Y axis
-        3: point3 pt.x pt.y (-pt.z)    -- Z axis
+        1: point3 pt.x pt.y (-pt.z)    -- YZ plane (Left/Right) - flip Z
+        2: point3 pt.x (-pt.y) pt.z    -- XZ plane (Front/Back) - flip Y
+        3: point3 (-pt.x) pt.y pt.z    -- XY plane (Up/Down) - flip X
         default: pt
     )
 )
@@ -103,14 +103,14 @@ fn getBonePosition skinMod boneIndex = (
  * @param sourceIndex - Source bone index
  * @param axis - Mirror axis (1:X, 2:Y, 3:Z)
  * @param tolerance - Position tolerance
- * @return Target bone index or 0 if not found
+ * @return #(targetBoneIndex, closestDistance, sourcePos, mirroredPos) or #(0, 0, [0,0,0], [0,0,0]) if not found
  */
 fn findBoneByPosition skinMod sourceIndex axis tolerance = (
     local sourcePos = getBonePosition skinMod sourceIndex
     local mirroredPos = mirrorPoint3 sourcePos axis
     
     local closestIndex = 0
-    local closestDist = tolerance
+    local closestDist = 1e9  -- Start with very large value to find the closest bone first
     local numBones = skinOps.GetNumberBones skinMod
     
     for i = 1 to numBones where i != sourceIndex do (
@@ -121,7 +121,13 @@ fn findBoneByPosition skinMod sourceIndex axis tolerance = (
             closestIndex = i
         )
     )
-    closestIndex
+    
+    -- Return array with debug info: #(index, distance, sourcePos, mirroredPos)
+    -- Only accept if within tolerance
+    if closestDist <= tolerance then
+        #(closestIndex, closestDist, sourcePos, mirroredPos)
+    else
+        #(0, closestDist, sourcePos, mirroredPos)  -- Return 0 but include debug info
 )
 
 -- ============================================================================
@@ -259,19 +265,33 @@ fn executeSkinEnvelopeMirror isNameBased leftToken rightToken caseSensitive axis
         targetBoneIndex = findBoneIndexByName skinMod targetBoneName caseSensitive:caseSensitive
         result += "Target bone (Name-based): " + targetBoneName + "\n"
     ) else (
-        targetBoneIndex = findBoneByPosition skinMod sourceBoneIndex axis tolerance
+        -- Position-based returns: #(index, distance, sourcePos, mirroredPos)
+        local posResult = findBoneByPosition skinMod sourceBoneIndex axis tolerance
+        targetBoneIndex = posResult[1]
+        local closestDist = posResult[2]
+        local sourcePos = posResult[3]
+        local mirroredPos = posResult[4]
+        
+        -- Show debug info
+        local planeNames = #("YZ (Left/Right)", "XZ (Front/Back)", "XY (Up/Down)")
+        result += "Source position: " + (sourcePos as string) + "\n"
+        result += "Mirrored position (" + planeNames[axis] + " plane): " + (mirroredPos as string) + "\n"
+        result += "Closest bone distance: " + (closestDist as string) + "\n"
+        
         if targetBoneIndex > 0 do (
             targetBoneName = skinOps.GetBoneName skinMod targetBoneIndex 0
         )
         result += "Target bone (Position-based): "
-        result += if targetBoneIndex > 0 then (targetBoneName + "\n") else "Not found\n"
+        result += if targetBoneIndex > 0 then (targetBoneName + "\n") else "Not found (distance > tolerance)\n"
     )
     
     -- Validate target bone
     if targetBoneIndex == 0 do (
         result += "\nError: Target bone not found."
-        if isNameBased do (
+        if isNameBased then (
             result += "\nCheck if bone '" + targetBoneName + "' exists in the Skin modifier."
+        ) else (
+            result += "\nTry: 1) Increase tolerance value, or 2) Change mirror axis (usually X for left/right symmetry)."
         )
         return result
     )
@@ -291,8 +311,8 @@ fn executeSkinEnvelopeMirror isNameBased leftToken rightToken caseSensitive axis
     result += "  End point: " + (envData.endPoint as string) + "\n"
     result += "  Cross sections: " + (envData.crossSections.count as string) + "\n"
     
-    local axisNames = #("X", "Y", "Z")
-    result += "\nMirror axis: " + axisNames[axis] + "\n"
+    local planeNames = #("YZ (Left/Right)", "XZ (Front/Back)", "XY (Up/Down)")
+    result += "\nMirror plane: " + planeNames[axis] + "\n"
     result += "Mirrored start: " + ((mirrorPoint3 envData.startPoint axis) as string) + "\n"
     result += "Mirrored end: " + ((mirrorPoint3 envData.endPoint axis) as string) + "\n"
     
@@ -325,18 +345,18 @@ rollout SkinEnvelopMirrorDialog "Skin Envelope Mirror" width:300 (
     -- Position-based options
     groupBox grpPositionBased "Position-based Options" pos:[10,65] width:280 height:50 visible:false
     label lblTolerance "Tolerance:" pos:[20,85] visible:false
-    spinner spnTolerance "" pos:[90,85] width:80 range:[0.001, 1000, 0.01] type:#float visible:false
+    spinner spnTolerance "" pos:[90,85] width:80 range:[0.001, 10000, 1.0] type:#float visible:false
     
-    -- Mirror axis (common)
-    groupBox grpAxis "Mirror Axis" pos:[10,160] width:280 height:45
-    radioButtons rdoAxis "" pos:[20,178] labels:#("X", "Y", "Z") default:3 columns:3
+    -- Mirror plane (common)
+    groupBox grpAxis "Mirror Plane" pos:[10,160] width:280 height:70
+    radioButtons rdoAxis "" pos:[20,178] labels:#("YZ (Left/Right)", "XZ (Front/Back)", "XY (Up/Down)") default:1 columns:1
     
     -- Execute button
-    button btnExecute "Mirror Envelope" pos:[10,210] width:280 height:35
+    button btnExecute "Mirror Envelope" pos:[10,235] width:280 height:35
     
     -- Result output
-    groupBox grpResult "Result" pos:[10,250] width:280 height:140
-    editText edtResult "" pos:[15,268] width:268 height:115 readOnly:true
+    groupBox grpResult "Result" pos:[10,275] width:280 height:140
+    editText edtResult "" pos:[15,293] width:268 height:115 readOnly:true
     
     -- Update UI visibility based on mode
     fn updateModeUI = (
@@ -379,4 +399,4 @@ rollout SkinEnvelopMirrorDialog "Skin Envelope Mirror" width:300 (
 )
 
 -- Create dialog
-createDialog SkinEnvelopMirrorDialog height:400
+createDialog SkinEnvelopMirrorDialog height:425
