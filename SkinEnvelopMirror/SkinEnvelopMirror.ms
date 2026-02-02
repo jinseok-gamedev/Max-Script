@@ -311,11 +311,6 @@ fn executeSkinEnvelopeMirror isNameBased leftToken rightToken caseSensitive axis
     result += "  End point: " + (envData.endPoint as string) + "\n"
     result += "  Cross sections: " + (envData.crossSections.count as string) + "\n"
     
-    local planeNames = #("YZ (Left/Right)", "XZ (Front/Back)", "XY (Up/Down)")
-    result += "\nMirror plane: " + planeNames[axis] + "\n"
-    result += "Mirrored start: " + ((mirrorPoint3 envData.startPoint axis) as string) + "\n"
-    result += "Mirrored end: " + ((mirrorPoint3 envData.endPoint axis) as string) + "\n"
-    
     -- Apply envelope data with undo support
     undo "Mirror Skin Envelope" on (
         applyEnvelopeData skinMod targetBoneIndex envData axis
@@ -332,13 +327,13 @@ fn executeSkinEnvelopeMirror isNameBased leftToken rightToken caseSensitive axis
 rollout SkinEnvelopMirrorDialog "Skin Envelope Mirror" width:300 (
     -- Mode selection
     groupBox grpMode "Target Bone Detection" pos:[10,10] width:280 height:50
-    radioButtons rdoMode "" pos:[20,28] labels:#("Name-based", "Position-based") default:1 columns:2
+    radioButtons rdoMode "" pos:[20,33] labels:#("Name-based", "Position-based") default:1 columns:2
     
     -- Name-based options
     groupBox grpNameBased "Name-based Options" pos:[10,65] width:280 height:90
-    label lblLeft "Left Token:" pos:[20,85] 
+    label lblLeft "Source Token:" pos:[20,85] 
     editText edtLeftToken "" pos:[90,83] width:80 text:"_L"
-    label lblRight "Right Token:" pos:[20,110]
+    label lblRight "Target Token:" pos:[20,110]
     editText edtRightToken "" pos:[90,108] width:80 text:"_R"
     checkBox chkCaseSensitive "Case Sensitive" pos:[20,135] checked:true
     
@@ -348,15 +343,15 @@ rollout SkinEnvelopMirrorDialog "Skin Envelope Mirror" width:300 (
     spinner spnTolerance "" pos:[90,85] width:80 range:[0.001, 10000, 1.0] type:#float visible:false
     
     -- Mirror plane (common)
-    groupBox grpAxis "Mirror Plane" pos:[10,160] width:280 height:70
-    radioButtons rdoAxis "" pos:[20,178] labels:#("YZ (Left/Right)", "XZ (Front/Back)", "XY (Up/Down)") default:1 columns:1
+    groupBox grpAxis "Mirror Plane" pos:[10,120] width:280 height:70
+    radioButtons rdoAxis "" pos:[20,137] labels:#("YZ (Left/Right)", "XZ (Front/Back)", "XY (Up/Down)") default:2 columns:1
     
     -- Execute button
-    button btnExecute "Mirror Envelope" pos:[10,235] width:280 height:35
+    button btnExecute "Mirror Envelope" pos:[10,195] width:280 height:35
     
     -- Result output
-    groupBox grpResult "Result" pos:[10,275] width:280 height:140
-    editText edtResult "" pos:[15,293] width:268 height:115 readOnly:true
+    groupBox grpResult "Result" pos:[10,235] width:280 height:140
+    editText edtResult "" pos:[15,251] width:268 height:115 readOnly:true
     
     -- Update UI visibility based on mode
     fn updateModeUI = (
@@ -374,6 +369,10 @@ rollout SkinEnvelopMirrorDialog "Skin Envelope Mirror" width:300 (
         grpPositionBased.visible = not isNameBased
         lblTolerance.visible = not isNameBased
         spnTolerance.visible = not isNameBased
+        
+        -- Mirror plane (only for Position-based)
+        grpAxis.visible = not isNameBased
+        rdoAxis.visible = not isNameBased
     )
     
     -- Event handlers
@@ -390,7 +389,8 @@ rollout SkinEnvelopMirrorDialog "Skin Envelope Mirror" width:300 (
         local leftToken = edtLeftToken.text
         local rightToken = edtRightToken.text
         local caseSensitive = chkCaseSensitive.checked
-        local axis = rdoAxis.state
+        -- Name-based always uses XZ plane (axis 2), Position-based uses selected plane
+        local axis = if isNameBased then 2 else rdoAxis.state
         local tolerance = spnTolerance.value
         
         local result = executeSkinEnvelopeMirror isNameBased leftToken rightToken caseSensitive axis tolerance
@@ -399,4 +399,4 @@ rollout SkinEnvelopMirrorDialog "Skin Envelope Mirror" width:300 (
 )
 
 -- Create dialog
-createDialog SkinEnvelopMirrorDialog height:425
+createDialog SkinEnvelopMirrorDialog height:385
