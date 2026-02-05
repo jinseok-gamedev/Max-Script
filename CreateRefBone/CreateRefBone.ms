@@ -68,7 +68,8 @@ rollout CreateRefBoneRollout "Create Ref Bone"
 			tFlag = true
 		)
 		
-		if ((getUserProp obj IDKEYWORD) == true) do
+		local propVal = getUserProp obj IDKEYWORD
+		if (propVal == "true" or propVal == true) do
 		(
 			tFlag = false
 		)
@@ -334,7 +335,8 @@ rollout CreateRefBoneRollout "Create Ref Bone"
 		
 		for obj in selection do
 		(
-			if (getUserProp obj IDKEYWORD) == "true" do
+			local propVal = getUserProp obj IDKEYWORD
+			if (propVal == "true" or propVal == true) do
 			(
 				append toDelete obj
 			)
