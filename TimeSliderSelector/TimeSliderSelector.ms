@@ -1,4 +1,5 @@
 try (destroyDialog TimeSliderSelectorDialog) catch()
+callbacks.removeScripts id:#TimeSliderSelector
 
 global TimeSliderSelectorDialog
 
@@ -19,6 +20,40 @@ fn refreshRangeList listBox =
     listBox.items = for r in TimeSliderRanges collect (formatRangeLabel r)
 )
 
+fn saveRangesToFileProps =
+(
+    local str = ""
+    for i = 1 to TimeSliderRanges.count do
+    (
+        local r = TimeSliderRanges[i]
+        str += (r.startFrame as string) + "," + (r.endFrame as string)
+        if i < TimeSliderRanges.count then str += ";"
+    )
+    if (fileProperties.findProperty #custom "TimeSliderRanges") > 0 then
+        fileProperties.deleteProperty #custom "TimeSliderRanges"
+    fileProperties.addProperty #custom "TimeSliderRanges" str
+)
+
+fn loadRangesFromFileProps =
+(
+    TimeSliderRanges = #()
+    local idx = fileProperties.findProperty #custom "TimeSliderRanges"
+    if idx > 0 then
+    (
+        local str = fileProperties.getPropertyValue #custom idx
+        if str != undefined and str != "" then
+        (
+            local pairs = filterString str ";"
+            for p in pairs do
+            (
+                local vals = filterString p ","
+                if vals.count == 2 then
+                    append TimeSliderRanges (TimeRangeData startFrame:(vals[1] as integer) endFrame:(vals[2] as integer))
+            )
+        )
+    )
+)
+
 rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
 (
     groupBox grpInput "Range Input" pos:[10,10] width:230 height:40
@@ -34,6 +69,7 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
     (
         spnStart.value = animationRange.start
         spnEnd.value = animationRange.end
+        loadRangesFromFileProps()
         refreshRangeList lstRanges
     )
 
@@ -51,6 +87,7 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
         append TimeSliderRanges (TimeRangeData startFrame:startVal endFrame:endVal)
         refreshRangeList lstRanges
         lstRanges.selection = TimeSliderRanges.count
+        saveRangesToFileProps()
     )
 
     on btnDelete pressed do
@@ -60,6 +97,7 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
         (
             deleteItem TimeSliderRanges idx
             refreshRangeList lstRanges
+            saveRangesToFileProps()
         )
     )
 
@@ -74,5 +112,8 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
     )
 )
 
+
+callbacks.addScript #filePostOpen "if TimeSliderSelectorDialog != undefined and TimeSliderSelectorDialog.open then (loadRangesFromFileProps(); refreshRangeList TimeSliderSelectorDialog.lstRanges)" id:#TimeSliderSelector
+callbacks.addScript #systemPostNew "TimeSliderRanges = #(); if TimeSliderSelectorDialog != undefined and TimeSliderSelectorDialog.open then (refreshRangeList TimeSliderSelectorDialog.lstRanges)" id:#TimeSliderSelector
 
 createDialog TimeSliderSelectorDialog
