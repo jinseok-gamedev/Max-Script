@@ -2,8 +2,12 @@ try (destroydialog AddCameraKey) catch()
 
 rollout AddCameraKey "Add Camera Key"
 (
+	local copiedFov = undefined
+	
 	button		btn_AddKey		"Add Camera Key"		offset:[0,0]		width:200 height:30	align:#center
 	button		btn_DeleteKey	"Delete Camera Key"	offset:[0,0]		width:200 height:30	align:#center
+	button		btn_CopyFov		"Copy FOV"				width:97 height:30	across:2
+	button		btn_PasteFov	"Paste FOV"				width:97 height:30
 	-- Fuction --------------------------------------------------------------------------------------------------------------------------------------
 	
 	fn AddCameraKey=
@@ -39,6 +43,37 @@ rollout AddCameraKey "Add Camera Key"
 			messagebox "You should select camera!"
 		)
 	)
+	
+	fn CopyFov=
+	(
+		if classof $ == Freecamera or classof $ == Targetcamera then
+		(
+			copiedFov = $.fov
+		)
+		else
+		(
+			messagebox "You should select camera!"
+		)
+	)
+	
+	fn PasteFov=
+	(
+		if copiedFov == undefined then
+		(
+			messagebox "Copy FOV first!"
+		)
+		else
+		(
+			if classof $ == Freecamera or classof $ == Targetcamera then
+			(
+				$.fov = copiedFov
+			)
+			else
+			(
+				messagebox "You should select camera!"
+			)
+		)
+	)
 
 	--Implementation-------------------------------------------------------------------------------------------------------------------------------------------------------
 	
@@ -51,5 +86,15 @@ rollout AddCameraKey "Add Camera Key"
 	(
 		DeleteCameraKey()
 	)
+	
+	on btn_CopyFov pressed do
+	(
+		CopyFov()
+	)
+	
+	on btn_PasteFov pressed do
+	(
+		PasteFov()
+	)
 )
-createdialog AddCameraKey width: 220 height: 75
+createdialog AddCameraKey width: 220 height: 110
