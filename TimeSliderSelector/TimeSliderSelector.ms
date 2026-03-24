@@ -111,10 +111,10 @@ fn getKeyRangeFromAllObjects =
 rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
 (
     groupBox grpInput "Range Input" pos:[10,10] width:230 height:70
-	button btnStart "Start" pos:[20,27] height:17
-    spinner spnStart pos:[65,28] width:55 height:15 type:#integer range:[-100000,100000,0] scale:1
-	button btnEnd "End" pos:[130,27] height:17
-    spinner spnEnd pos:[170,28] width:60 height:15 type:#integer range:[-100000,100000,100] scale:1
+    button btnStart "Start" pos:[20,27] height:17
+    dotNetControl spnStart "System.Windows.Forms.NumericUpDown" pos:[65,25] width:55 height:20
+    button btnEnd "End" pos:[130,27] height:17
+    dotNetControl spnEnd "System.Windows.Forms.NumericUpDown" pos:[170,25] width:60 height:20
     button btnAdd "Add" pos:[20,50] width:68 height:22
     button btnEdit "Edit" pos:[91,50] width:68 height:22
     button btnDelete "Delete" pos:[162,50] width:68 height:22
@@ -134,13 +134,25 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
         grpInput.pos = [m, m]
         grpInput.width = innerW
 
-        local halfInner = (innerW - innerPad * 2) / 2
-        btnStart.pos = [m + innerPad, 27]
-        spnStart.pos = [m + innerPad + 45, 28]
+        local btnLabelW = 45
+        local endLabelW = 40
+        local halfGap = 6
+        local availW = innerW - innerPad * 2
+        local halfW = (availW - halfGap) / 2
 
-        local midX = m + innerPad + halfInner
+        local spnStartW = halfW - btnLabelW
+        if spnStartW < 30 do spnStartW = 30
+        local spnEndW = halfW - endLabelW
+        if spnEndW < 30 do spnEndW = 30
+
+        btnStart.pos = [m + innerPad, 27]
+        spnStart.pos = [m + innerPad + btnLabelW, 25]
+        spnStart.Width = spnStartW
+
+        local midX = m + innerPad + halfW + halfGap
         btnEnd.pos = [midX, 27]
-        spnEnd.pos = [midX + 40, 28]
+        spnEnd.pos = [midX + endLabelW, 25]
+        spnEnd.Width = spnEndW
 
         local btnW = (innerW - innerPad * 2) / 3
         btnAdd.pos = [m + innerPad, 50]
@@ -171,6 +183,19 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
 
     local layoutReady = false
 
+    fn initNumericUpDown ctrl val =
+    (
+        local darkBg = (dotNetClass "System.Drawing.Color").FromArgb 68 68 68
+        local lightFg = (dotNetClass "System.Drawing.Color").FromArgb 220 220 220
+        ctrl.Minimum = -100000
+        ctrl.Maximum = 100000
+        ctrl.DecimalPlaces = 0
+        ctrl.Value = val
+        ctrl.BackColor = darkBg
+        ctrl.ForeColor = lightFg
+        ctrl.BorderStyle = (dotNetClass "System.Windows.Forms.BorderStyle").FixedSingle
+    )
+
     on TimeSliderSelectorDialog open do
     (
         lstRanges.IntegralHeight = false
@@ -178,10 +203,11 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
         lstRanges.ForeColor = (dotNetClass "System.Drawing.Color").FromArgb 220 220 220
         lstRanges.BorderStyle = (dotNetClass "System.Windows.Forms.BorderStyle").FixedSingle
 
-        spnStart.value = animationRange.start
-        spnEnd.value = animationRange.end
+        initNumericUpDown spnStart (animationRange.start.frame as integer)
+        initNumericUpDown spnEnd (animationRange.end.frame as integer)
         loadRangesFromFileProps()
         refreshRangeList lstRanges
+        doLayout 250 290
         layoutReady = true
     )
 
@@ -217,8 +243,8 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
             local s = result[1]
             local e = result[2]
             if s == e then e = s + 1
-            spnStart.value = s
-            spnEnd.value = e
+            spnStart.Value = s
+            spnEnd.Value = e
             animationRange = interval s e
             sliderTime = s
         )
@@ -230,18 +256,18 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
 
 	on btnStart pressed do
     (
-		spnStart.value = animationRange.start
+		spnStart.Value = (animationRange.start.frame as integer)
     )
 
 	on btnEnd pressed do
     (
-		spnEnd.value = animationRange.end
+		spnEnd.Value = (animationRange.end.frame as integer)
     )
 	
     on btnAdd pressed do
     (
-        local startVal = spnStart.value
-        local endVal = spnEnd.value
+        local startVal = spnStart.Value as integer
+        local endVal = spnEnd.Value as integer
         if startVal > endVal then
         (
             local temp = startVal
@@ -271,8 +297,8 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
         local idx = lstRanges.SelectedIndex + 1
         if idx > 0 and idx <= TimeSliderRanges.count then
         (
-            local startVal = spnStart.value
-            local endVal = spnEnd.value
+            local startVal = spnStart.Value as integer
+            local endVal = spnEnd.Value as integer
             if startVal > endVal then
             (
                 local temp = startVal
@@ -293,8 +319,8 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
         if idx > 0 and idx <= TimeSliderRanges.count then
         (
             local rangeData = TimeSliderRanges[idx]
-            spnStart.value = rangeData.startFrame
-            spnEnd.value = rangeData.endFrame
+            spnStart.Value = rangeData.startFrame
+            spnEnd.Value = rangeData.endFrame
         )
     )
 
@@ -304,8 +330,8 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
         if idx > 0 and idx <= TimeSliderRanges.count then
         (
             local rangeData = TimeSliderRanges[idx]
-            spnStart.value = rangeData.startFrame
-            spnEnd.value = rangeData.endFrame
+            spnStart.Value = rangeData.startFrame
+            spnEnd.Value = rangeData.endFrame
             animationRange = interval rangeData.startFrame rangeData.endFrame
             sliderTime = rangeData.startFrame
         )
