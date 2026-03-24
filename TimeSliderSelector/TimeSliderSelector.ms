@@ -1,7 +1,10 @@
+try (if DialogMinSizeInstance != undefined do (DialogMinSizeInstance.Cleanup(); DialogMinSizeInstance = undefined)) catch()
 try (destroyDialog TimeSliderSelectorDialog) catch()
 callbacks.removeScripts id:#TimeSliderSelector
 
 global TimeSliderSelectorDialog
+global DialogMinSizeInstance
+global DialogMinSizerType
 
 struct TimeRangeData (
     startFrame,
@@ -58,6 +61,71 @@ fn loadRangesFromFileProps =
             )
         )
     )
+)
+
+fn initDialogMinSize hwnd minW minH =
+(
+    try
+    (
+        if DialogMinSizeInstance != undefined do
+        (
+            try (DialogMinSizeInstance.Cleanup()) catch()
+            DialogMinSizeInstance = undefined
+        )
+
+        if DialogMinSizerType == undefined do
+        (
+            local code = ""
+            code += "using System;\n"
+            code += "using System.Windows.Forms;\n"
+            code += "using System.Runtime.InteropServices;\n"
+            code += "public class DialogMinSizer : NativeWindow {\n"
+            code += "    int minW, minH;\n"
+            code += "    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X; public int Y; }\n"
+            code += "    [StructLayout(LayoutKind.Sequential)] public struct MINMAXINFO {\n"
+            code += "        public POINT ptReserved; public POINT ptMaxSize; public POINT ptMaxPosition;\n"
+            code += "        public POINT ptMinTrackSize; public POINT ptMaxTrackSize;\n"
+            code += "    }\n"
+            code += "    [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }\n"
+            code += "    [DllImport(\"user32.dll\")] static extern bool GetWindowRect(IntPtr h, out RECT r);\n"
+            code += "    [DllImport(\"user32.dll\")] static extern bool GetClientRect(IntPtr h, out RECT r);\n"
+            code += "    public void Setup(IntPtr hwnd, int cw, int ch) {\n"
+            code += "        RECT wr, cr; GetWindowRect(hwnd, out wr); GetClientRect(hwnd, out cr);\n"
+            code += "        minW = cw + (wr.Right-wr.Left) - (cr.Right-cr.Left);\n"
+            code += "        minH = ch + (wr.Bottom-wr.Top) - (cr.Bottom-cr.Top);\n"
+            code += "        AssignHandle(hwnd);\n"
+            code += "    }\n"
+            code += "    protected override void WndProc(ref Message m) {\n"
+            code += "        base.WndProc(ref m);\n"
+            code += "        if (m.Msg == 0x0024) {\n"
+            code += "            MINMAXINFO i = (MINMAXINFO)Marshal.PtrToStructure(m.LParam, typeof(MINMAXINFO));\n"
+            code += "            i.ptMinTrackSize.X = minW; i.ptMinTrackSize.Y = minH;\n"
+            code += "            Marshal.StructureToPtr(i, m.LParam, true);\n"
+            code += "        }\n"
+            code += "    }\n"
+            code += "    public void Cleanup() { ReleaseHandle(); }\n"
+            code += "}\n"
+
+            local provider = dotNetObject "Microsoft.CSharp.CSharpCodeProvider"
+            local compilerParams = dotNetObject "System.CodeDom.Compiler.CompilerParameters"
+            compilerParams.GenerateInMemory = true
+            compilerParams.ReferencedAssemblies.Add "System.dll"
+            compilerParams.ReferencedAssemblies.Add "System.Windows.Forms.dll"
+            local results = provider.CompileAssemblyFromSource compilerParams #(code)
+            if results.Errors.Count == 0 then
+                DialogMinSizerType = results.CompiledAssembly.GetType "DialogMinSizer"
+            else
+                for i = 0 to results.Errors.Count - 1 do
+                    format "DialogMinSizer compile error: %\n" (results.Errors.Item[i].ErrorText)
+        )
+
+        if DialogMinSizerType != undefined do
+        (
+            DialogMinSizeInstance = (dotNetClass "System.Activator").CreateInstance DialogMinSizerType
+            DialogMinSizeInstance.Setup (dotNetObject "System.IntPtr" hwnd) minW minH
+        )
+    )
+    catch (format "initDialogMinSize failed: %\n" (getCurrentException()))
 )
 
 fn collectKeysFromController ctrl minKey maxKey =
@@ -209,6 +277,7 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
         refreshRangeList lstRanges
         doLayout 250 290
         layoutReady = true
+        initDialogMinSize TimeSliderSelectorDialog.hwnd 400 490
     )
 
     on btnMoveUp pressed do
@@ -337,9 +406,23 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
         )
     )
 
+    on TimeSliderSelectorDialog close do
+    (
+        if DialogMinSizeInstance != undefined do
+        (
+            try (DialogMinSizeInstance.Cleanup()) catch()
+            DialogMinSizeInstance = undefined
+        )
+    )
+
     on TimeSliderSelectorDialog resized val do
     (
-        if layoutReady do doLayout val.x val.y
+        if layoutReady do
+        (
+            local w = if val.x < 250 then 250 else val.x
+            local h = if val.y < 290 then 290 else val.y
+            doLayout w h
+        )
     )
 )
 
