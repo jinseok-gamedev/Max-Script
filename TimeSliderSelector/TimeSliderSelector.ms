@@ -15,9 +15,15 @@ fn formatRangeLabel idx rangeData =
     (idx as string) + ". " + (rangeData.startFrame as string) + " ~ " + (rangeData.endFrame as string)
 )
 
-fn refreshRangeList listBox =
+fn refreshRangeList lb =
 (
-    listBox.items = for i = 1 to TimeSliderRanges.count collect (formatRangeLabel i TimeSliderRanges[i])
+    local sel = lb.SelectedIndex
+    lb.BeginUpdate()
+    lb.Items.Clear()
+    for i = 1 to TimeSliderRanges.count do
+        lb.Items.Add (formatRangeLabel i TimeSliderRanges[i])
+    lb.EndUpdate()
+    if sel >= 0 and sel < lb.Items.count do lb.SelectedIndex = sel
 )
 
 fn saveRangesToFileProps =
@@ -113,40 +119,92 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
     button btnEdit "Edit" pos:[91,50] width:68 height:22
     button btnDelete "Delete" pos:[162,50] width:68 height:22
 
-    listBox lstRanges "" pos:[10,85] width:230 height:10
+    dotNetControl lstRanges "System.Windows.Forms.ListBox" pos:[10,85] width:230 height:134
 
     button btnMoveUp "Move Up" pos:[10,225] width:112 height:22
     button btnMoveDown "Move Down" pos:[128,225] width:112 height:22
     button btnFitToKeys "Fit to Keys" pos:[10,253] width:230 height:28
 
+    fn doLayout w h =
+    (
+        local m = 10
+        local innerW = w - m * 2
+        local innerPad = 10
+
+        grpInput.pos = [m, m]
+        grpInput.width = innerW
+
+        local halfInner = (innerW - innerPad * 2) / 2
+        btnStart.pos = [m + innerPad, 27]
+        spnStart.pos = [m + innerPad + 45, 28]
+
+        local midX = m + innerPad + halfInner
+        btnEnd.pos = [midX, 27]
+        spnEnd.pos = [midX + 40, 28]
+
+        local btnW = (innerW - innerPad * 2) / 3
+        btnAdd.pos = [m + innerPad, 50]
+        btnAdd.width = btnW - 2
+        btnEdit.pos = [m + innerPad + btnW, 50]
+        btnEdit.width = btnW - 2
+        btnDelete.pos = [m + innerPad + btnW * 2, 50]
+        btnDelete.width = btnW - 2
+
+        local fitH = 28
+        local moveH = 22
+        local gap = 6
+        btnFitToKeys.pos = [m, h - fitH - m]
+        btnFitToKeys.width = innerW
+
+        local moveY = h - fitH - gap - moveH - m
+        btnMoveUp.pos = [m, moveY]
+        btnMoveUp.width = (innerW - gap) / 2
+        btnMoveDown.pos = [m + (innerW - gap) / 2 + gap, moveY]
+        btnMoveDown.width = (innerW - gap) / 2
+
+        lstRanges.pos = [m, 85]
+        lstRanges.width = innerW
+        local listPixelH = moveY - 85 - gap
+        if listPixelH < 30 do listPixelH = 30
+        lstRanges.height = listPixelH
+    )
+
+    local layoutReady = false
+
     on TimeSliderSelectorDialog open do
     (
+        lstRanges.IntegralHeight = false
+        lstRanges.BackColor = (dotNetClass "System.Drawing.Color").FromArgb 68 68 68
+        lstRanges.ForeColor = (dotNetClass "System.Drawing.Color").FromArgb 220 220 220
+        lstRanges.BorderStyle = (dotNetClass "System.Windows.Forms.BorderStyle").FixedSingle
+
         spnStart.value = animationRange.start
         spnEnd.value = animationRange.end
         loadRangesFromFileProps()
         refreshRangeList lstRanges
+        layoutReady = true
     )
 
     on btnMoveUp pressed do
     (
-        local idx = lstRanges.selection
+        local idx = lstRanges.SelectedIndex + 1
         if idx > 1 and idx <= TimeSliderRanges.count then
         (
             swap TimeSliderRanges[idx] TimeSliderRanges[idx - 1]
             refreshRangeList lstRanges
-            lstRanges.selection = idx - 1
+            lstRanges.SelectedIndex = idx - 2
             saveRangesToFileProps()
         )
     )
 
     on btnMoveDown pressed do
     (
-        local idx = lstRanges.selection
+        local idx = lstRanges.SelectedIndex + 1
         if idx > 0 and idx < TimeSliderRanges.count then
         (
             swap TimeSliderRanges[idx] TimeSliderRanges[idx + 1]
             refreshRangeList lstRanges
-            lstRanges.selection = idx + 1
+            lstRanges.SelectedIndex = idx
             saveRangesToFileProps()
         )
     )
@@ -193,14 +251,14 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
 
         append TimeSliderRanges (TimeRangeData startFrame:startVal endFrame:endVal)
         refreshRangeList lstRanges
-        lstRanges.selection = TimeSliderRanges.count
+        lstRanges.SelectedIndex = TimeSliderRanges.count - 1
         saveRangesToFileProps()
     )
 
     on btnDelete pressed do
     (
-        local idx = lstRanges.selection
-        if idx != undefined and idx > 0 and idx <= TimeSliderRanges.count then
+        local idx = lstRanges.SelectedIndex + 1
+        if idx > 0 and idx <= TimeSliderRanges.count then
         (
             deleteItem TimeSliderRanges idx
             refreshRangeList lstRanges
@@ -210,7 +268,7 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
 
     on btnEdit pressed do
     (
-        local idx = lstRanges.selection
+        local idx = lstRanges.SelectedIndex + 1
         if idx > 0 and idx <= TimeSliderRanges.count then
         (
             local startVal = spnStart.value
@@ -224,16 +282,26 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
             TimeSliderRanges[idx].startFrame = startVal
             TimeSliderRanges[idx].endFrame = endVal
             refreshRangeList lstRanges
-            lstRanges.selection = idx
+            lstRanges.SelectedIndex = idx - 1
             saveRangesToFileProps()
-            animationRange = interval startVal endVal
-            sliderTime = startVal
         )
     )
 
-    on lstRanges selected idx do
+    on lstRanges SelectedIndexChanged sender args do
     (
-        if idx != undefined and idx > 0 and idx <= TimeSliderRanges.count then
+        local idx = lstRanges.SelectedIndex + 1
+        if idx > 0 and idx <= TimeSliderRanges.count then
+        (
+            local rangeData = TimeSliderRanges[idx]
+            spnStart.value = rangeData.startFrame
+            spnEnd.value = rangeData.endFrame
+        )
+    )
+
+    on lstRanges MouseDoubleClick sender args do
+    (
+        local idx = lstRanges.SelectedIndex + 1
+        if idx > 0 and idx <= TimeSliderRanges.count then
         (
             local rangeData = TimeSliderRanges[idx]
             spnStart.value = rangeData.startFrame
@@ -242,10 +310,15 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
             sliderTime = rangeData.startFrame
         )
     )
+
+    on TimeSliderSelectorDialog resized val do
+    (
+        if layoutReady do doLayout val.x val.y
+    )
 )
 
 
 callbacks.addScript #filePostOpen "if TimeSliderSelectorDialog != undefined and TimeSliderSelectorDialog.open then (loadRangesFromFileProps(); refreshRangeList TimeSliderSelectorDialog.lstRanges)" id:#TimeSliderSelector
 callbacks.addScript #systemPostNew "TimeSliderRanges = #(); if TimeSliderSelectorDialog != undefined and TimeSliderSelectorDialog.open then (refreshRangeList TimeSliderSelectorDialog.lstRanges)" id:#TimeSliderSelector
 
-createDialog TimeSliderSelectorDialog
+createDialog TimeSliderSelectorDialog width:250 height:290 style:#(#style_titlebar, #style_border, #style_sysmenu, #style_resizing)
