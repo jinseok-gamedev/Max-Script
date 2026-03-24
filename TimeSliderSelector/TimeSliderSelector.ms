@@ -105,14 +105,16 @@ fn getKeyRangeFromAllObjects =
 rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
 (
     groupBox grpInput "Range Input" pos:[10,10] width:230 height:70
-    spinner spnStart "Start " pos:[35,27] width:80 height:15 type:#integer range:[-100000,100000,0] scale:1
-    spinner spnEnd "End " pos:[150,27] width:80 height:15 type:#integer range:[-100000,100000,100] scale:1
-    button btnFitToKeys "Fit to Keys" pos:[20,50] width:210 height:22
+	button btnStart "Start" pos:[20,27] height:17
+    spinner spnStart pos:[65,28] width:55 height:15 type:#integer range:[-100000,100000,0] scale:1
+	button btnEnd "End" pos:[130,27] height:17
+    spinner spnEnd pos:[170,28] width:60 height:15 type:#integer range:[-100000,100000,100] scale:1
+    button btnAdd "Add" pos:[20,50] width:100 height:22
+	button btnDelete "Delete" pos:[130,50] width:100 height:22
 
     listBox lstRanges "" pos:[10,85] width:230 height:10
 
-    button btnAdd "Add" pos:[10,225] width:110 height:28
-    button btnDelete "Delete" pos:[130,225] width:110 height:28
+    button btnFitToKeys "Fit to Keys" pos:[10,225] width:230 height:28
 
     on TimeSliderSelectorDialog open do
     (
@@ -141,6 +143,16 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
         )
     )
 
+	on btnStart pressed do
+    (
+		spnStart.value = animationRange.start
+    )
+
+	on btnEnd pressed do
+    (
+		spnEnd.value = animationRange.end
+    )
+	
     on btnAdd pressed do
     (
         local startVal = spnStart.value
