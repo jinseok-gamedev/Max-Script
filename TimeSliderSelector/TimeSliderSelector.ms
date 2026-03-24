@@ -5,6 +5,7 @@ callbacks.removeScripts id:#TimeSliderSelector
 global TimeSliderSelectorDialog
 global DialogMinSizeInstance
 global DialogMinSizerType
+DialogMinSizerType = undefined
 
 struct TimeRangeData (
     startFrame,
@@ -89,6 +90,11 @@ fn initDialogMinSize hwnd minW minH =
             code += "    [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }\n"
             code += "    [DllImport(\"user32.dll\")] static extern bool GetWindowRect(IntPtr h, out RECT r);\n"
             code += "    [DllImport(\"user32.dll\")] static extern bool GetClientRect(IntPtr h, out RECT r);\n"
+            code += "    [DllImport(\"user32.dll\")] static extern int GetWindowLong(IntPtr h, int i);\n"
+            code += "    [DllImport(\"user32.dll\")] static extern int SetWindowLong(IntPtr h, int i, int v);\n"
+            code += "    [DllImport(\"user32.dll\")] static extern int SendMessage(IntPtr h, int m, int w, int l);\n"
+            code += "    [DllImport(\"user32.dll\")] static extern bool InvalidateRect(IntPtr h, IntPtr r, bool e);\n"
+            code += "    [DllImport(\"user32.dll\")] static extern bool UpdateWindow(IntPtr h);\n"
             code += "    public void Setup(IntPtr hwnd, int cw, int ch) {\n"
             code += "        RECT wr, cr; GetWindowRect(hwnd, out wr); GetClientRect(hwnd, out cr);\n"
             code += "        minW = cw + (wr.Right-wr.Left) - (cr.Right-cr.Left);\n"
@@ -102,6 +108,16 @@ fn initDialogMinSize hwnd minW minH =
             code += "            i.ptMinTrackSize.X = minW; i.ptMinTrackSize.Y = minH;\n"
             code += "            Marshal.StructureToPtr(i, m.LParam, true);\n"
             code += "        }\n"
+            code += "    }\n"
+            code += "    public void EnableDoubleBuffer() {\n"
+            code += "        int ex = GetWindowLong(Handle, -20);\n"
+            code += "        SetWindowLong(Handle, -20, ex | 0x02000000);\n"
+            code += "    }\n"
+            code += "    public void SuspendDraw() { SendMessage(Handle, 11, 0, 0); }\n"
+            code += "    public void ResumeDraw() {\n"
+            code += "        SendMessage(Handle, 11, 1, 0);\n"
+            code += "        InvalidateRect(Handle, IntPtr.Zero, true);\n"
+            code += "        UpdateWindow(Handle);\n"
             code += "    }\n"
             code += "    public void Cleanup() { ReleaseHandle(); }\n"
             code += "}\n"
@@ -278,6 +294,7 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
         doLayout 250 290
         layoutReady = true
         initDialogMinSize TimeSliderSelectorDialog.hwnd 400 490
+        if DialogMinSizeInstance != undefined do DialogMinSizeInstance.EnableDoubleBuffer()
     )
 
     on btnMoveUp pressed do
@@ -421,7 +438,9 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
         (
             local w = if val.x < 250 then 250 else val.x
             local h = if val.y < 290 then 290 else val.y
+            if DialogMinSizeInstance != undefined do DialogMinSizeInstance.SuspendDraw()
             doLayout w h
+            if DialogMinSizeInstance != undefined do DialogMinSizeInstance.ResumeDraw()
         )
     )
 )
