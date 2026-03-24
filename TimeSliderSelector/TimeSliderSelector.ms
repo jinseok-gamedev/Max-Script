@@ -10,14 +10,14 @@ struct TimeRangeData (
 
 global TimeSliderRanges = #()
 
-fn formatRangeLabel rangeData =
+fn formatRangeLabel idx rangeData =
 (
-    (rangeData.startFrame as string) + " - " + (rangeData.endFrame as string)
+    (idx as string) + ". " + (rangeData.startFrame as string) + " ~ " + (rangeData.endFrame as string)
 )
 
 fn refreshRangeList listBox =
 (
-    listBox.items = for r in TimeSliderRanges collect (formatRangeLabel r)
+    listBox.items = for i = 1 to TimeSliderRanges.count collect (formatRangeLabel i TimeSliderRanges[i])
 )
 
 fn saveRangesToFileProps =
@@ -109,12 +109,15 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
     spinner spnStart pos:[65,28] width:55 height:15 type:#integer range:[-100000,100000,0] scale:1
 	button btnEnd "End" pos:[130,27] height:17
     spinner spnEnd pos:[170,28] width:60 height:15 type:#integer range:[-100000,100000,100] scale:1
-    button btnAdd "Add" pos:[20,50] width:100 height:22
-	button btnDelete "Delete" pos:[130,50] width:100 height:22
+    button btnAdd "Add" pos:[20,50] width:68 height:22
+    button btnEdit "Edit" pos:[91,50] width:68 height:22
+    button btnDelete "Delete" pos:[162,50] width:68 height:22
 
     listBox lstRanges "" pos:[10,85] width:230 height:10
 
-    button btnFitToKeys "Fit to Keys" pos:[10,225] width:230 height:28
+    button btnMoveUp "Move Up" pos:[10,225] width:112 height:22
+    button btnMoveDown "Move Down" pos:[128,225] width:112 height:22
+    button btnFitToKeys "Fit to Keys" pos:[10,253] width:230 height:28
 
     on TimeSliderSelectorDialog open do
     (
@@ -122,6 +125,30 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
         spnEnd.value = animationRange.end
         loadRangesFromFileProps()
         refreshRangeList lstRanges
+    )
+
+    on btnMoveUp pressed do
+    (
+        local idx = lstRanges.selection
+        if idx > 1 and idx <= TimeSliderRanges.count then
+        (
+            swap TimeSliderRanges[idx] TimeSliderRanges[idx - 1]
+            refreshRangeList lstRanges
+            lstRanges.selection = idx - 1
+            saveRangesToFileProps()
+        )
+    )
+
+    on btnMoveDown pressed do
+    (
+        local idx = lstRanges.selection
+        if idx > 0 and idx < TimeSliderRanges.count then
+        (
+            swap TimeSliderRanges[idx] TimeSliderRanges[idx + 1]
+            refreshRangeList lstRanges
+            lstRanges.selection = idx + 1
+            saveRangesToFileProps()
+        )
     )
 
     on btnFitToKeys pressed do
@@ -181,11 +208,36 @@ rollout TimeSliderSelectorDialog "Time Slider Selector" width:250
         )
     )
 
+    on btnEdit pressed do
+    (
+        local idx = lstRanges.selection
+        if idx > 0 and idx <= TimeSliderRanges.count then
+        (
+            local startVal = spnStart.value
+            local endVal = spnEnd.value
+            if startVal > endVal then
+            (
+                local temp = startVal
+                startVal = endVal
+                endVal = temp
+            )
+            TimeSliderRanges[idx].startFrame = startVal
+            TimeSliderRanges[idx].endFrame = endVal
+            refreshRangeList lstRanges
+            lstRanges.selection = idx
+            saveRangesToFileProps()
+            animationRange = interval startVal endVal
+            sliderTime = startVal
+        )
+    )
+
     on lstRanges selected idx do
     (
         if idx != undefined and idx > 0 and idx <= TimeSliderRanges.count then
         (
             local rangeData = TimeSliderRanges[idx]
+            spnStart.value = rangeData.startFrame
+            spnEnd.value = rangeData.endFrame
             animationRange = interval rangeData.startFrame rangeData.endFrame
             sliderTime = rangeData.startFrame
         )
